@@ -82,6 +82,15 @@
 /* 如果SOF不正确，在接收器启动阶段自动清除，则设置为逻辑1。在MFAuthent命令期间，该位仅对106kBd有效。如果在一个数据流中接收的字节数不正确，则ProtocolErr位设置为逻辑1 */
 #define BIT_ProtocolErr         0x01
 
+#define MAXRLEN 18
+/**
+ * M1卡指令
+ */
+#define PICC_WRITE 0xA0
+#define PICC_READ  0x30
+#define AUTH_KEYA  0x60
+#define AUTH_KEYB  0x61
+
 /**
  * 下面是一些错误定义
  */

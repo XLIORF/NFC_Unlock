@@ -6,13 +6,12 @@
 
 #include "guards.h"
 #include "rc522.h"
-#include "rc522_def.h"
 #include "rc522_registers.h"
-#include "iso14445_def.h"
+#include "rc522_def.h"
 #include "port.h"
 
 static const char *TAG = "rc522";
-#define MAXRLEN 18
+
 /**
  * @brief Macro for safely freeing memory.
  *        This macro checks if the pointer is not NULL before calling the free
