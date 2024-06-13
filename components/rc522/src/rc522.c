@@ -27,33 +27,7 @@ static const char *TAG = "rc522";
         ptr = NULL; \
     }
 
-struct rc522
-{
-    bool running;                         /*<! Indicates whether rc522 task is running or not */
-    rc522_config_t *config;               /*<! Configuration */
-    TaskHandle_t task_handle;             /*<! Handle of task */
-    esp_event_loop_handle_t event_handle; /*<! Handle of event loop */
-    spi_device_handle_t spi_handle;
-    // TODO: Use new 'status' field, instead of initialized, scanning, etc...
-    bool initialized; /*<! Set on the first start() when configuration is sent to
-                         rc522 */
-    bool scanning;    /*<! Whether the rc522 is in scanning or idle mode */
-    bool tag_was_present_last_time;
-    bool bus_initialized_by_user; /*<! Whether the bus has been initialized
-                                     manually by the user, before calling
-                                     rc522_create function */
-};
-
 ESP_EVENT_DEFINE_BASE(RC522_EVENTS);
-
-static esp_err_t rc522_spi_send(rc522_handle_t rc522, uint8_t *buffer,
-                                uint8_t length);
-static esp_err_t rc522_spi_receive(rc522_handle_t rc522, uint8_t *buffer,
-                                   uint8_t length, uint8_t addr);
-static esp_err_t rc522_i2c_send(rc522_handle_t rc522, uint8_t *buffer,
-                                uint8_t length);
-static esp_err_t rc522_i2c_receive(rc522_handle_t rc522, uint8_t *buffer,
-                                   uint8_t length, uint8_t addr);
 
 static void rc522_task(void *arg);
 
@@ -72,13 +46,13 @@ static esp_err_t rc522_write_n(rc522_handle_t rc522, uint8_t addr, uint8_t n,
     switch (rc522->config->transport)
     {
     case RC522_TRANSPORT_SPI:
-        ESP_ERR_JMP_GUARD(rc522_spi_send(rc522, buffer, n + 1));
+        ERR_JMP_GUARD(rc522_spi_send(rc522, buffer, n + 1));
         break;
     case RC522_TRANSPORT_I2C:
-        ESP_ERR_JMP_GUARD(rc522_i2c_send(rc522, buffer, n + 1));
+        ERR_JMP_GUARD(rc522_i2c_send(rc522, buffer, n + 1));
         break;
     default:
-        ESP_ERR_LOG_AND_JMP_GUARD(ESP_ERR_INVALID_STATE,
+        ERR_LOG_AND_JMP_GUARD(ESP_ERR_INVALID_STATE,
                                   "write: Unknown transport");
         break;
     }
@@ -109,13 +83,13 @@ static esp_err_t rc522_read_n(rc522_handle_t rc522, uint8_t addr, uint8_t n,
     switch (rc522->config->transport)
     {
     case RC522_TRANSPORT_SPI:
-        ESP_ERR_JMP_GUARD(rc522_spi_receive(rc522, buffer, n, addr));
+        ERR_JMP_GUARD(rc522_spi_receive(rc522, buffer, n, addr));
         break;
     case RC522_TRANSPORT_I2C:
-        ESP_ERR_JMP_GUARD(rc522_i2c_receive(rc522, buffer, n, addr));
+        ERR_JMP_GUARD(rc522_i2c_receive(rc522, buffer, n, addr));
         break;
     default:
-        ESP_ERR_LOG_AND_JMP_GUARD(ESP_ERR_INVALID_STATE, "read: Unknown transport");
+        ERR_LOG_AND_JMP_GUARD(ESP_ERR_INVALID_STATE, "read: Unknown transport");
         break;
     }
 
@@ -140,7 +114,7 @@ static esp_err_t rc522_set_bitmask(rc522_handle_t rc522, uint8_t addr,
     esp_err_t err = ESP_OK;
     uint8_t tmp;
 
-    ESP_ERR_RET_GUARD(rc522_read(rc522, addr, &tmp));
+    ERR_RET_GUARD(rc522_read(rc522, addr, &tmp));
 
     return rc522_write(rc522, addr, tmp | mask);
 }
@@ -152,7 +126,7 @@ static esp_err_t rc522_clear_bitmask(rc522_handle_t rc522, uint8_t addr,
     esp_err_t err = ESP_OK;
     uint8_t tmp;
 
-    ESP_ERR_RET_GUARD(rc522_read(rc522, addr, &tmp));
+    ERR_RET_GUARD(rc522_read(rc522, addr, &tmp));
 
     return rc522_write(rc522, addr, tmp & ~mask);
 }
@@ -169,11 +143,11 @@ static esp_err_t rc522_antenna_on(rc522_handle_t rc522)
     esp_err_t err = ESP_OK;
     uint8_t tmp;
 
-    ESP_ERR_RET_GUARD(rc522_read(rc522, RC522_TX_CONTROL_REG, &tmp));
+    ERR_RET_GUARD(rc522_read(rc522, RC522_TX_CONTROL_REG, &tmp));
 
     if (~(tmp & 0x03))
     {
-        ESP_ERR_RET_GUARD(rc522_set_bitmask(rc522, RC522_TX_CONTROL_REG, 0x03));
+        ERR_RET_GUARD(rc522_set_bitmask(rc522, RC522_TX_CONTROL_REG, 0x03));
     }
 
     return rc522_write(rc522, RC522_RF_CFG_REG, 0x60); // 43dB gain
@@ -243,11 +217,11 @@ static esp_err_t rc522_create_transport(rc522_handle_t rc522)
                 .quadhd_io_num = -1,
             };
 
-            ESP_ERR_RET_GUARD(
+            ERR_RET_GUARD(
                 spi_bus_initialize(rc522->config->spi.host, &buscfg, 0));
         }
 
-        ESP_ERR_RET_GUARD(spi_bus_add_device(rc522->config->spi.host, &devcfg,
+        ERR_RET_GUARD(spi_bus_add_device(rc522->config->spi.host, &devcfg,
                                              &rc522->spi_handle));
     }
     break;
@@ -262,8 +236,8 @@ static esp_err_t rc522_create_transport(rc522_handle_t rc522)
             .master.clk_speed = rc522->config->i2c.clock_speed_hz,
         };
 
-        ESP_ERR_RET_GUARD(i2c_param_config(rc522->config->i2c.port, &conf));
-        ESP_ERR_RET_GUARD(i2c_driver_install(rc522->config->i2c.port, conf.mode,
+        ERR_RET_GUARD(i2c_param_config(rc522->config->i2c.port, &conf));
+        ERR_RET_GUARD(i2c_driver_install(rc522->config->i2c.port, conf.mode,
                                              false, false, 0x00));
     }
     break;
@@ -289,10 +263,10 @@ esp_err_t rc522_create(rc522_config_t *config, rc522_handle_t *out_rc522)
 
     ALLOC_RET_GUARD(rc522 = calloc(1, sizeof(struct rc522)));
 
-    ESP_ERR_LOG_AND_JMP_GUARD(rc522_clone_config(config, &(rc522->config)),
+    ERR_LOG_AND_JMP_GUARD(rc522_clone_config(config, &(rc522->config)),
                               "Fail to clone config");
 
-    ESP_ERR_LOG_AND_JMP_GUARD(rc522_create_transport(rc522),
+    ERR_LOG_AND_JMP_GUARD(rc522_create_transport(rc522),
                               "Fail to create transport");
 
     esp_event_loop_args_t event_args = {
@@ -300,7 +274,7 @@ esp_err_t rc522_create(rc522_config_t *config, rc522_handle_t *out_rc522)
         .task_name = NULL, // no task will be created
     };
 
-    ESP_ERR_LOG_AND_JMP_GUARD(
+    ERR_LOG_AND_JMP_GUARD(
         esp_event_loop_create(&event_args, &rc522->event_handle),
         "Fail to create event loop");
 
@@ -378,19 +352,19 @@ static esp_err_t rc522_calculate_crc(rc522_handle_t rc522, uint8_t *data,
     uint8_t nn = 0;
 
     // 清除CRC终端
-    ESP_ERR_RET_GUARD(rc522_clear_bitmask(rc522, RC522_DIV_INT_REQ_REG, 0x04));
+    ERR_RET_GUARD(rc522_clear_bitmask(rc522, RC522_DIV_INT_REQ_REG, 0x04));
     // 取消正在执行的操作
-    ESP_ERR_RET_GUARD(rc522_write(rc522, RC522_COMMAND_REG, CMD_IDLE));
+    ERR_RET_GUARD(rc522_write(rc522, RC522_COMMAND_REG, CMD_IDLE));
     // 立即清除内部FIFO缓冲区的读写指针
-    ESP_ERR_RET_GUARD(rc522_set_bitmask(rc522, RC522_FIFO_LEVEL_REG, 0x80));
+    ERR_RET_GUARD(rc522_set_bitmask(rc522, RC522_FIFO_LEVEL_REG, 0x80));
     // 像RC522的FIFO中写入数据
-    ESP_ERR_RET_GUARD(rc522_write_n(rc522, RC522_FIFO_DATA_REG, n, data));
+    ERR_RET_GUARD(rc522_write_n(rc522, RC522_FIFO_DATA_REG, n, data));
     // 执行计算CRC命令
-    ESP_ERR_RET_GUARD(rc522_write(rc522, RC522_COMMAND_REG, CMD_CalcCRC));
+    ERR_RET_GUARD(rc522_write(rc522, RC522_COMMAND_REG, CMD_CalcCRC));
 
     for (;;)
     {
-        ESP_ERR_RET_GUARD(rc522_read(rc522, RC522_DIV_INT_REQ_REG, &nn));
+        ERR_RET_GUARD(rc522_read(rc522, RC522_DIV_INT_REQ_REG, &nn));
 
         i--;
 
@@ -402,10 +376,10 @@ static esp_err_t rc522_calculate_crc(rc522_handle_t rc522, uint8_t *data,
 
     uint8_t tmp;
 
-    ESP_ERR_RET_GUARD(rc522_read(rc522, RC522_CRC_RESULT_LSB_REG, &tmp));
+    ERR_RET_GUARD(rc522_read(rc522, RC522_CRC_RESULT_LSB_REG, &tmp));
     buffer[0] = tmp;
 
-    ESP_ERR_RET_GUARD(rc522_read(rc522, RC522_CRC_RESULT_MSB_REG, &tmp));
+    ERR_RET_GUARD(rc522_read(rc522, RC522_CRC_RESULT_MSB_REG, &tmp));
     buffer[1] = tmp;
 
     return ESP_OK;
@@ -436,46 +410,44 @@ static esp_err_t rc522_card_write(rc522_handle_t rc522, uint8_t cmd,
         irq_wait = 0x30; // 与下面命令结合，表示接收中断和空闲中断标志位
     }
     // irq | 0x80 表示输出到IRQ上的电平与寄存器反相，即低电平表示中断发生
-    ESP_ERR_JMP_GUARD(rc522_write(rc522, RC522_COMM_INT_EN_REG, irq | 0x80));
+    ERR_JMP_GUARD(rc522_write(rc522, RC522_COMM_INT_EN_REG, irq | 0x80));
     // 表示ComIrqReg寄存器中的标记位已清除
-    ESP_ERR_JMP_GUARD(rc522_clear_bitmask(rc522, RC522_COMM_INT_REQ_REG, 0x80));
+    ERR_JMP_GUARD(rc522_clear_bitmask(rc522, RC522_COMM_INT_REQ_REG, 0x80));
     // 停止命令执行，进入空闲状态
-    ESP_ERR_JMP_GUARD(rc522_write(rc522, RC522_COMMAND_REG, 0x00));
+    ERR_JMP_GUARD(rc522_write(rc522, RC522_COMMAND_REG, 0x00));
     // 立即清除内部FIFO缓冲区的读写指针
-    ESP_ERR_JMP_GUARD(rc522_set_bitmask(rc522, RC522_FIFO_LEVEL_REG, 0x80));
+    ERR_JMP_GUARD(rc522_set_bitmask(rc522, RC522_FIFO_LEVEL_REG, 0x80));
     // 像FIFO中写入数据
-    ESP_ERR_JMP_GUARD(rc522_write_n(rc522, RC522_FIFO_DATA_REG, n, data));
+    ERR_JMP_GUARD(rc522_write_n(rc522, RC522_FIFO_DATA_REG, n, data));
     // 执行命令
-    ESP_ERR_JMP_GUARD(rc522_write(rc522, RC522_COMMAND_REG, cmd));
+    ERR_JMP_GUARD(rc522_write(rc522, RC522_COMMAND_REG, cmd));
 
     if (cmd == CMD_Transceive)
     {
         // 开始数据发送，与CMD_Transmit配合使用
-        ESP_ERR_JMP_GUARD(rc522_set_bitmask(rc522, RC522_BIT_FRAMING_REG, 0x80));
+        ERR_JMP_GUARD(rc522_set_bitmask(rc522, RC522_BIT_FRAMING_REG, 0x80));
     }
 
     uint16_t i = 1000;
 
     for (;;)
     {
-        ESP_ERR_JMP_GUARD(rc522_read(rc522, RC522_COMM_INT_REQ_REG, &nn));
+        ERR_JMP_GUARD(rc522_read(rc522, RC522_COMM_INT_REQ_REG, &nn));
 
         i--;
 
-        if (!(i != 0 && (((nn & 0x01) == 0) &&
-                         ((nn & irq_wait) ==
-                          0))))
+        if (!(i != 0 && (((nn & 0x01) == 0) && ((nn & irq_wait) == 0))))
         { // i==0或触发空闲中断或触发需要的中断之一后退出
             break;
         }
     }
     // 清除开始发送位， 不知何用
-    ESP_ERR_JMP_GUARD(rc522_clear_bitmask(rc522, RC522_BIT_FRAMING_REG, 0x80));
+    ERR_JMP_GUARD(rc522_clear_bitmask(rc522, RC522_BIT_FRAMING_REG, 0x80));
 
     if (i != 0)
     {
         // 读取错误寄存器
-        ESP_ERR_JMP_GUARD(rc522_read(rc522, RC522_ERROR_REG, &tmp));
+        ERR_JMP_GUARD(rc522_read(rc522, RC522_ERROR_REG, &tmp));
 
         if ((tmp & 0x1B) == 0x00)
         {
@@ -483,9 +455,9 @@ static esp_err_t rc522_card_write(rc522_handle_t rc522, uint8_t cmd,
             if (cmd == CMD_Transceive)
             {
                 // 读出FIFO中的数据的个数，
-                ESP_ERR_JMP_GUARD(rc522_read(rc522, RC522_FIFO_LEVEL_REG, &nn));
+                ERR_JMP_GUARD(rc522_read(rc522, RC522_FIFO_LEVEL_REG, &nn));
                 // 获取最后接受的有效位
-                ESP_ERR_JMP_GUARD(rc522_read(rc522, RC522_CONTROL_REG, &tmp));
+                ERR_JMP_GUARD(rc522_read(rc522, RC522_CONTROL_REG, &tmp));
 
                 last_bits = tmp & 0x07; // 去掉其他无效的位
 
@@ -507,7 +479,7 @@ static esp_err_t rc522_card_write(rc522_handle_t rc522, uint8_t cmd,
 
                     for (i = 0; i < _res_n; i++)
                     {
-                        ESP_ERR_JMP_GUARD(rc522_read(rc522, RC522_FIFO_DATA_REG, &tmp));
+                        ERR_JMP_GUARD(rc522_read(rc522, RC522_FIFO_DATA_REG, &tmp));
                         _result[i] = tmp;
                     }
                 }
@@ -540,11 +512,11 @@ static esp_err_t rc522_request(rc522_handle_t rc522, uint8_t *res_n, uint8_t **c
     uint8_t req_mode = 0x26;
 
     // 清理指示MIFARECyptol单元接通以及所有卡的数据通信被加密的情况
-    ESP_ERR_RET_GUARD(rc522_clear_bitmask(rc522, RC522_STATUS_2_REG, 0x08));
+    ERR_RET_GUARD(rc522_clear_bitmask(rc522, RC522_STATUS_2_REG, 0x08));
     // 接受字节的第一个位开始对齐，在发送过程中最后一个字节的前7个位有效。
-    ESP_ERR_RET_GUARD(rc522_write(rc522, RC522_BIT_FRAMING_REG, 0x07));
+    ERR_RET_GUARD(rc522_write(rc522, RC522_BIT_FRAMING_REG, 0x07));
     // 像卡片发送REQA（0x26）请求指令,返回两个字节的卡类型
-    ESP_ERR_RET_GUARD(rc522_card_write(rc522, CMD_Transceive, &req_mode, 1, &_res_n, &_result));
+    ERR_RET_GUARD(rc522_card_write(rc522, CMD_Transceive, &req_mode, 1, &_res_n, &_result));
 
     if (_res_n * 8 != 0x10)
     {
@@ -567,13 +539,13 @@ static esp_err_t rc522_anticoll(rc522_handle_t rc522, uint8_t **sn)
     uint8_t _res_n;
 
     // 清MFCryptol On位 只有成功执行MFAuthent命令后，该位才能置位
-    ESP_ERR_RET_GUARD(rc522_clear_bitmask(rc522, RC522_STATUS_2_REG, 0x08));
+    ERR_RET_GUARD(rc522_clear_bitmask(rc522, RC522_STATUS_2_REG, 0x08));
     // 清理寄存器 停止收发
-    ESP_ERR_JMP_GUARD(rc522_write(rc522, RC522_BIT_FRAMING_REG, 0x00));
+    ERR_JMP_GUARD(rc522_write(rc522, RC522_BIT_FRAMING_REG, 0x00));
     // 清ValuesAfterColl所有接收的位在冲突后被清除
-    ESP_ERR_RET_GUARD(rc522_clear_bitmask(rc522, COLL_REG, 0x80));
+    ERR_RET_GUARD(rc522_clear_bitmask(rc522, COLL_REG, 0x80));
     // 发送卡指令Anticollision CL2（0x93 0x20），返回值位UID
-    ESP_ERR_JMP_GUARD(rc522_card_write(rc522, CMD_Transceive, (uint8_t[]){0x93, 0x20}, 2, &_res_n, &_result));
+    ERR_JMP_GUARD(rc522_card_write(rc522, CMD_Transceive, (uint8_t[]){0x93, 0x20}, 2, &_res_n, &_result));
 
     // TODO: Some cards have length of 4, and some of them have length of 7 bytes
     //       here we are using one extra byte which is not part of UID.
@@ -581,7 +553,7 @@ static esp_err_t rc522_anticoll(rc522_handle_t rc522, uint8_t **sn)
     //       to retrieve the serial number aka UID
     if (_result && _res_n != 5)
     { // all cards/tags serial numbers is 5 bytes long (??)
-        ESP_ERR_LOG_AND_JMP_GUARD(ESP_ERR_INVALID_RESPONSE, "invalid length of serial number");
+        ERR_LOG_AND_JMP_GUARD(ESP_ERR_INVALID_RESPONSE, "invalid length of serial number");
     }
 
     JMP_GUARD_GATES(
@@ -658,11 +630,11 @@ char rc522_card_block_auth(rc522_handle_t rc522, uint8_t auth_mode, uint8_t addr
     {
         ucComMF522Buf[i + 8] = *(pSnr + i);
     }
-    ESP_ERR_JMP_GUARD(rc522_clear_bitmask(rc522, RC522_STATUS_2_REG, 0x08));
-    ESP_ERR_JMP_GUARD(rc522_card_write(rc522, CMD_MFAuthent, ucComMF522Buf, 12, &res_data_n, &res_data));
+    ERR_JMP_GUARD(rc522_clear_bitmask(rc522, RC522_STATUS_2_REG, 0x08));
+    ERR_JMP_GUARD(rc522_card_write(rc522, CMD_MFAuthent, ucComMF522Buf, 12, &res_data_n, &res_data));
     uint8_t status = 0;
-    ESP_ERR_JMP_GUARD(rc522_read(rc522, RC522_STATUS_2_REG, &status));
-    rc522_log("密钥验证%s", ((status & 0x08) == 0x08) ? "成功": "失败");
+    ERR_JMP_GUARD(rc522_read(rc522, RC522_STATUS_2_REG, &status));
+    rc522_log("密钥验证%s", ((status & 0x08) == 0x08) ? "成功" : "失败");
     // rc522_log("密钥验证返回值：");
     // rc522_hexdump(res_data, res_data_n);
     if (!(status & 0x08))
@@ -784,7 +756,7 @@ rc522_err_t rc522_card_halt(rc522_handle_t rc522)
 // UID为你要修改的卡的UID key_type：0为KEYA，非0为KEYB KEY为密钥 RW:1是读，0是写 data_addr为修改的地址 data为数据内容
 rc522_err_t rc522_card_block_RW(rc522_handle_t rc522, uint8_t *UID, uint8_t key_type, uint8_t *KEY, uint8_t RW, uint8_t data_addr, uint8_t *data)
 {
-    if(rc522 == NULL || KEY == NULL)
+    if (rc522 == NULL || KEY == NULL)
     {
         return RC522_INVALID_ARG;
     }
@@ -868,12 +840,12 @@ static esp_err_t rc522_get_tag(rc522_handle_t rc522, uint8_t **result)
     uint8_t *_result = NULL;
     uint8_t *res_data = NULL;
     uint8_t res_data_n;
-    ESP_ERR_JMP_GUARD(rc522_request(rc522, &res_data_n, &res_data));
+    ERR_JMP_GUARD(rc522_request(rc522, &res_data_n, &res_data));
 
     if (res_data != NULL)
     {
         FREE(res_data);
-        ESP_ERR_JMP_GUARD(rc522_anticoll(rc522, &_result));
+        ERR_JMP_GUARD(rc522_anticoll(rc522, &_result));
 
         if (_result != NULL)
         {
@@ -945,16 +917,16 @@ esp_err_t rc522_start(rc522_handle_t rc522)
         }
         // ------- End of RW test --------
         // 软件复位
-        ESP_ERR_RET_GUARD(rc522_write(rc522, RC522_COMMAND_REG, CMD_SoftResert));
-        ESP_ERR_RET_GUARD(rc522_write(rc522, RC522_TIMER_MODE_REG, 0x8D));
-        ESP_ERR_RET_GUARD(rc522_write(rc522, RC522_TIMER_PRESCALER_REG, 0x3E));
-        ESP_ERR_RET_GUARD(rc522_write(rc522, RC522_TIMER_RELOAD_LSB_REG, 0x1E));
-        ESP_ERR_RET_GUARD(rc522_write(rc522, RC522_TIMER_RELOAD_MSB_REG, 0x00));
-        ESP_ERR_RET_GUARD(rc522_write(rc522, RC522_TX_ASK_REG, 0x40));
-        ESP_ERR_RET_GUARD(rc522_write(rc522, RC522_MODE_REG, 0x3D));
+        ERR_RET_GUARD(rc522_write(rc522, RC522_COMMAND_REG, CMD_SoftResert));
+        ERR_RET_GUARD(rc522_write(rc522, RC522_TIMER_MODE_REG, 0x8D));
+        ERR_RET_GUARD(rc522_write(rc522, RC522_TIMER_PRESCALER_REG, 0x3E));
+        ERR_RET_GUARD(rc522_write(rc522, RC522_TIMER_RELOAD_LSB_REG, 0x1E));
+        ERR_RET_GUARD(rc522_write(rc522, RC522_TIMER_RELOAD_MSB_REG, 0x00));
+        ERR_RET_GUARD(rc522_write(rc522, RC522_TX_ASK_REG, 0x40));
+        ERR_RET_GUARD(rc522_write(rc522, RC522_MODE_REG, 0x3D));
 
-        ESP_ERR_RET_GUARD(rc522_antenna_on(rc522));
-        ESP_ERR_RET_GUARD(rc522_firmware(rc522, &tmp));
+        ERR_RET_GUARD(rc522_antenna_on(rc522));
+        ERR_RET_GUARD(rc522_firmware(rc522, &tmp));
 
         rc522->initialized = true;
 
@@ -1060,79 +1032,14 @@ static esp_err_t rc522_dispatch_event(rc522_handle_t rc522, rc522_event_t event,
         .ptr = data,
     };
 
-    ESP_ERR_RET_GUARD(esp_event_post_to(rc522->event_handle, RC522_EVENTS, event,
+    ERR_RET_GUARD(esp_event_post_to(rc522->event_handle, RC522_EVENTS, event,
                                         &e_data, sizeof(rc522_event_data_t),
                                         portMAX_DELAY));
 
     return esp_event_loop_run(rc522->event_handle, 0);
 }
 
-// rc522的SPI传输函数
-static esp_err_t rc522_spi_send(rc522_handle_t rc522, uint8_t *buffer, uint8_t length)
-{
-    buffer[0] = (buffer[0] << 1) & 0x7E;
-
-    return spi_device_transmit(rc522->spi_handle, &(spi_transaction_t){
-                                                      .length = 8 * length,
-                                                      .tx_buffer = buffer,
-                                                  });
-}
-
-/* 按RC522要求的地址格式对SPI接受函数进行封装 */
-static esp_err_t rc522_spi_receive(rc522_handle_t rc522, uint8_t *buffer, uint8_t length, uint8_t addr)
-{
-    esp_err_t err = ESP_OK;
-
-    addr = ((addr << 1) & 0x7E) | 0x80;
-
-    if (SPI_DEVICE_HALFDUPLEX & rc522->config->spi.device_flags)
-    {
-        ESP_ERR_RET_GUARD(spi_device_transmit(rc522->spi_handle,
-                                              &(spi_transaction_t){
-                                                  .flags = SPI_TRANS_USE_TXDATA,
-                                                  .length = 8,
-                                                  .tx_data[0] = addr,
-                                                  .rxlength = 8 * length,
-                                                  .rx_buffer = buffer,
-                                              }));
-    }
-    else
-    { // Fullduplex
-        ESP_ERR_RET_GUARD(spi_device_transmit(rc522->spi_handle,
-                                              &(spi_transaction_t){
-                                                  .flags = SPI_TRANS_USE_TXDATA,
-                                                  .length = 8,
-                                                  .tx_data[0] = addr,
-                                              }));
-
-        ESP_ERR_RET_GUARD(
-            spi_device_transmit(rc522->spi_handle, &(spi_transaction_t){
-                                                       .flags = 0x00,
-                                                       .length = 8,
-                                                       .rxlength = 8 * length,
-                                                       .rx_buffer = buffer,
-                                                   }));
-    }
-
-    return err;
-}
-
-static inline esp_err_t rc522_i2c_send(rc522_handle_t rc522, uint8_t *buffer, uint8_t length)
-{
-    return i2c_master_write_to_device(
-        rc522->config->i2c.port, RC522_I2C_ADDRESS, buffer, length,
-        rc522->config->i2c.rw_timeout_ms / portTICK_PERIOD_MS);
-}
-
-static inline esp_err_t rc522_i2c_receive(rc522_handle_t rc522, uint8_t *buffer,
-                                          uint8_t length, uint8_t addr)
-{
-    return i2c_master_write_read_device(
-        rc522->config->i2c.port, RC522_I2C_ADDRESS, &addr, 1, buffer, length,
-        rc522->config->i2c.rw_timeout_ms / portTICK_PERIOD_MS);
-}
-
-void block_rw_test(rc522_handle_t rc522 )
+void block_rw_test(rc522_handle_t rc522)
 {
     unsigned char KeyA_default[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
     uint8_t data[16];
@@ -1189,7 +1096,6 @@ static void rc522_task(void *arg)
                 rc522_dispatch_event(rc522, RC522_EVENT_TAG_SCANNED, &tag);
                 rc522->tag_was_present_last_time = true;
                 // block_rw_test(rc522);
-                
             }
             else
             {
@@ -1205,8 +1111,6 @@ static void rc522_task(void *arg)
             vTaskDelay(delay_interval_ms / portTICK_PERIOD_MS);
             continue;
         }
-
-        
 
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }

@@ -82,6 +82,22 @@ typedef struct {
     uint16_t card_type;
 } rc522_tag_t;
 
+struct rc522
+{
+    bool running;                         /*<! Indicates whether rc522 task is running or not */
+    rc522_config_t *config;               /*<! Configuration */
+    TaskHandle_t task_handle;             /*<! Handle of task */
+    esp_event_loop_handle_t event_handle; /*<! Handle of event loop */
+    spi_device_handle_t spi_handle;
+    // TODO: Use new 'status' field, instead of initialized, scanning, etc...
+    bool initialized; /*<! Set on the first start() when configuration is sent to
+                         rc522 */
+    bool scanning;    /*<! Whether the rc522 is in scanning or idle mode */
+    bool tag_was_present_last_time;
+    bool bus_initialized_by_user; /*<! Whether the bus has been initialized
+                                     manually by the user, before calling
+                                     rc522_create function */
+};
 /**
  * @brief Create RC522 scanner handle.
  *        To start scanning tags call the rc522_start function.
