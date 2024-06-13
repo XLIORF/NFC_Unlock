@@ -8,6 +8,7 @@
 #include "rc522.h"
 #include "rc522_def.h"
 #include "rc522_registers.h"
+#include "iso14445_def.h"
 
 static const char *TAG = "rc522";
 #define MAXRLEN 18
@@ -595,6 +596,10 @@ static esp_err_t rc522_anticoll(rc522_handle_t rc522, uint8_t **sn)
     return err;
 }
 
+/// @brief 选择卡
+/// @param rc522[in] rc522处理句柄
+/// @param sn[in] 卡片序列号
+/// @return 成功返回ESP_OK
 static esp_err_t rc522_selece_card(rc522_handle_t rc522, uint8_t *sn)
 {
     esp_err_t err = ESP_OK;
@@ -679,7 +684,6 @@ char PcdAuthState(rc522_handle_t rc522, uint8_t auth_mode, uint8_t addr, uint8_t
  */
 char PcdWrite(rc522_handle_t rc522, uint8_t ucAddr, uint8_t *pData)
 {
-#define PICC_WRITE 0xA0
     esp_err_t err = ESP_OK;
     uint8_t uc, ucComMF522Buf[MAXRLEN];
     uint8_t ulLen;
@@ -712,7 +716,7 @@ char PcdWrite(rc522_handle_t rc522, uint8_t ucAddr, uint8_t *pData)
     return err;
 }
 
-/* 
+/*
  * 函数名：PcdRead
  * 描述  ：读取M1卡一块数据
  * 输入  ：u8 ucAddr，块地址
@@ -723,11 +727,10 @@ char PcdWrite(rc522_handle_t rc522, uint8_t ucAddr, uint8_t *pData)
  */
 char PcdRead(rc522_handle_t rc522, uint8_t ucAddr, uint8_t **pData)
 {
-#define PICC_READ 0x30
     esp_err_t err = ESP_OK;
     uint8_t ucComMF522Buf[MAXRLEN];
     uint8_t ulLen;
-    uint8_t* result = NULL;
+    uint8_t *result = NULL;
 
     ucComMF522Buf[0] = PICC_READ;
     ucComMF522Buf[1] = ucAddr;
@@ -756,6 +759,23 @@ static inline uint8_t self_to_addr(uint8_t sector, uint8_t block)
     return sector * 4 + block;
 }
 
+rc522_err_t rc522_card_halt(rc522_handle_t rc522)
+{
+    rc522_err_t err = RC522_OK;
+    uint8_t *res_data = NULL;
+    uint8_t res_data_n;
+    uint8_t buf[] = {0x50, 0x00, 0x00, 0x00};
+    // 计算CRC，填充指令
+    err = rc522_calculate_crc(rc522, buf, 2, &buf[2]);
+    // 发送卡指令 Halt（0x50 0x00）
+    err = rc522_card_write(rc522, CMD_Transceive, buf, 4, &res_data_n, &res_data);
+    FREE(res_data);
+    // 表示MIFARE
+    // Crypto1单元已打开，因此与卡的所有数据通信都已加密。只能通过成功执行仅在MIFARE标准卡的读/写模式下有效的MFAuthent命令将其设置为逻辑1。此位由软件清除
+    err = rc522_clear_bitmask(rc522, RC522_STATUS_2_REG, 0x08);
+    return err;
+}
+
 // 搜卡，防冲突，暂停，返回序列号
 static esp_err_t rc522_get_tag(rc522_handle_t rc522, uint8_t **result)
 {
@@ -764,8 +784,6 @@ static esp_err_t rc522_get_tag(rc522_handle_t rc522, uint8_t **result)
     uint8_t *res_data = NULL;
     uint8_t res_data_n;
     ESP_ERR_JMP_GUARD(rc522_request(rc522, &res_data_n, &res_data));
-    uint16_t Card_type = ((uint16_t)res_data[0]) << 8 | ((uint16_t)res_data[1]);
-    ESP_LOGI(TAG, "扫描到%#X类型的卡片", Card_type);
 
     if (res_data != NULL)
     {
@@ -1041,15 +1059,6 @@ static inline esp_err_t rc522_i2c_receive(rc522_handle_t rc522, uint8_t *buffer,
         rc522->config->i2c.rw_timeout_ms / portTICK_PERIOD_MS);
 }
 
-esp_err_t test_func(rc522_handle_t rc522)
-{
-    esp_err_t err = ESP_OK;
-
-    // ESP_LOGI("[测试函数]", "读取结果为:");
-    // esp_log_buffer_hexdump_internal("[测试函数]", data, 1,  ESP_LOG_INFO);
-    return err;
-}
-
 // RC522的任务
 static void rc522_task(void *arg)
 {
@@ -1084,7 +1093,6 @@ static void rc522_task(void *arg)
                 .serial_number = rc522_sn_to_u64(serial_no_array),
                 .snp = (uint8_t[]){serial_no_array[0], serial_no_array[1], serial_no_array[2], serial_no_array[3]}};
             FREE(serial_no_array);
-            test_func(rc522);
             rc522_dispatch_event(rc522, RC522_EVENT_TAG_SCANNED, &tag);
             rc522->tag_was_present_last_time = true;
         }

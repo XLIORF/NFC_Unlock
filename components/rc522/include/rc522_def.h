@@ -81,13 +81,12 @@
 /* 如果SOF不正确，在接收器启动阶段自动清除，则设置为逻辑1。在MFAuthent命令期间，该位仅对106kBd有效。如果在一个数据流中接收的字节数不正确，则ProtocolErr位设置为逻辑1 */
 #define BIT_ProtocolErr         0x01
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+/**
+ * 下面是一些错误定义
+ */
 
-
-
-
-#ifdef __cplusplus
-}
-#endif
+typedef enum {
+    RC522_OK,
+    RC522_ERR,
+    RC522_FAIL,
+} rc522_err_t;
