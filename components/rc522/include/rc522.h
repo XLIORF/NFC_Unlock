@@ -71,6 +71,8 @@ typedef struct {
 
 typedef struct {
     uint64_t serial_number;
+    uint8_t* snp;
+    uint16_t card_type;
 } rc522_tag_t;
 
 /**
