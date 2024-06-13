@@ -308,7 +308,7 @@ void rc522_init()
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     while (1)
     {
-        rc522_card_block_RW(scanner, NULL, 0, KeyA_default, 1, 0x0c, 926451);
+        rc522_card_block_RW(scanner, NULL, 0, KeyA_default, 1, 0x0c, data);
         if(strncmp((const char *)data, "Hello,from wlx", 15) == 0)
         {
             auth_success = 1;
