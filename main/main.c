@@ -44,8 +44,8 @@ static void rc522_handler(void *arg, esp_event_base_t base, int32_t event_id, vo
     case RC522_EVENT_TAG_SCANNED:
     {
         rc522_tag_t *tag = (rc522_tag_t *)data->ptr;
-        ESP_LOGI(TAG, "Tag scanned (sn: %02x:%02x:%02x:%02x)", tag->snp[0], tag->snp[1], tag->snp[2], tag->snp[3]);
-        ESP_LOGI(TAG, "Tag scanned (sn: %" PRIu64 ")", tag->serial_number);
+        // ESP_LOGI(TAG, "Tag scanned (sn: %02x:%02x:%02x:%02x)", tag->snp[0], tag->snp[1], tag->snp[2], tag->snp[3]);
+        // ESP_LOGI(TAG, "Tag scanned (sn: %" PRIu64 ")", tag->serial_number);
         // printf("%"PRIu64"\n", tag->serial_number - tagsn);
         if (tag->serial_number - tagsn == 0)
             auth_success = 1;

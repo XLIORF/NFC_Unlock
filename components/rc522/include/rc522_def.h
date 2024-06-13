@@ -88,5 +88,14 @@
 typedef enum {
     RC522_OK,
     RC522_ERR,
-    RC522_FAIL,
+    RC522_FAILD,
+    RC522_NO_CARD,
+    RC522_ANTICOLL_FAILD,
+    RC522_UID_NO_MATCH,
+    RC522_AUTH_FAILD,
+    RC522_CARD_FAILD,
+    RC522_CARD_BLOCK_READ_FAILD,
+    RC522_CARD_BLOCK_WRITE_FAILD,
 } rc522_err_t;
+
+unsigned char KeyA_default[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
