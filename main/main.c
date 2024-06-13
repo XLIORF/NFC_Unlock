@@ -37,20 +37,20 @@ static bool sec_conn = false;
 
 static void rc522_handler(void *arg, esp_event_base_t base, int32_t event_id, void *event_data)
 {
-    rc522_event_data_t *data = (rc522_event_data_t *)event_data;
-    uint64_t tagsn = 505127348134ULL;
+    // rc522_event_data_t *data = (rc522_event_data_t *)event_data;
+    // uint64_t tagsn = 505127348134ULL;
     switch (event_id)
     {
     case RC522_EVENT_TAG_SCANNED:
-    {
-        rc522_tag_t *tag = (rc522_tag_t *)data->ptr;
+    
+        // rc522_tag_t *tag = (rc522_tag_t *)data->ptr;
         // ESP_LOGI(TAG, "Tag scanned (sn: %02x:%02x:%02x:%02x)", tag->snp[0], tag->snp[1], tag->snp[2], tag->snp[3]);
         // ESP_LOGI(TAG, "Tag scanned (sn: %" PRIu64 ")", tag->serial_number);
         // printf("%"PRIu64"\n", tag->serial_number - tagsn);
-        if (tag->serial_number - tagsn == 0)
-            auth_success = 1;
-    }
-    break;
+        // if (tag->serial_number - tagsn == 0)
+        //     auth_success = 1;
+    
+        break;
     }
 }
 
@@ -302,6 +302,22 @@ void rc522_init()
     rc522_create(&config, &scanner);
     rc522_register_events(scanner, RC522_EVENT_ANY, rc522_handler, NULL);
     rc522_start(scanner);
+    unsigned char KeyA_default[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+    uint8_t data[16];
+    memset(data, 0, 16);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    while (1)
+    {
+        rc522_card_block_RW(scanner, NULL, 0, KeyA_default, 1, 0x0c, 926451);
+        if(strncmp((const char *)data, "Hello,from wlx", 15) == 0)
+        {
+            auth_success = 1;
+            ESP_LOGW("身份验证","验证成功，欢迎"); 
+            memset(data, 0, 16);
+        }
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+    }
+    
 }
 
 void app_main(void)

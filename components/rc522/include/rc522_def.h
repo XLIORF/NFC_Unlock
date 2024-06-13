@@ -1,5 +1,6 @@
 #pragma once
-
+#ifndef __RC522_DEF_H__
+#define __RC522_DEF_H__
 #define CMD_IDLE                0x00 // 0b0000 空操作 让RC522处于空闲状态
 #define CMD_Mem                 0x01 // 0b0001
 #define CMD_GenerateRandomID    0x02 // 0b0010
@@ -89,6 +90,7 @@ typedef enum {
     RC522_OK,
     RC522_ERR,
     RC522_FAILD,
+    RC522_INVALID_ARG,
     RC522_NO_CARD,
     RC522_ANTICOLL_FAILD,
     RC522_UID_NO_MATCH,
@@ -98,4 +100,6 @@ typedef enum {
     RC522_CARD_BLOCK_WRITE_FAILD,
 } rc522_err_t;
 
-unsigned char KeyA_default[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+
+
+#endif

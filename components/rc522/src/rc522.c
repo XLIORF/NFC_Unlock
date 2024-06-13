@@ -785,6 +785,10 @@ rc522_err_t rc522_card_halt(rc522_handle_t rc522)
 // UID为你要修改的卡的UID key_type：0为KEYA，非0为KEYB KEY为密钥 RW:1是读，0是写 data_addr为修改的地址 data为数据内容
 rc522_err_t rc522_card_block_RW(rc522_handle_t rc522, uint8_t *UID, uint8_t key_type, uint8_t *KEY, uint8_t RW, uint8_t data_addr, uint8_t *data)
 {
+    if(rc522 == NULL || KEY == NULL)
+    {
+        return RC522_INVALID_ARG;
+    }
     uint8_t len = 0;
     uint8_t *card_type;
     esp_err_t err = rc522_request(rc522, &len, &card_type); // 寻卡
@@ -820,8 +824,8 @@ rc522_err_t rc522_card_block_RW(rc522_handle_t rc522, uint8_t *UID, uint8_t key_
         err = rc522_card_block_read(rc522, data_addr, &_data);
         if (err == ESP_OK)
         {
-            rc522_log("data:");
-            rc522_hexdump(_data, 16);
+            // rc522_log("data:");
+            // rc522_hexdump(_data, 16);
             memcpy(data, _data, 16);
         }
         else
@@ -1129,6 +1133,32 @@ static inline esp_err_t rc522_i2c_receive(rc522_handle_t rc522, uint8_t *buffer,
         rc522->config->i2c.rw_timeout_ms / portTICK_PERIOD_MS);
 }
 
+void block_rw_test(rc522_handle_t rc522 )
+{
+    unsigned char KeyA_default[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+    uint8_t data[16];
+    data[0] = 'H';
+    data[1] = 'e';
+    data[2] = 'l';
+    data[3] = 'l';
+    data[4] = 'o';
+    data[5] = ',';
+    data[6] = 'f';
+    data[7] = 'r';
+    data[8] = 'o';
+    data[9] = 'm';
+    data[10] = ' ';
+    data[11] = 'w';
+    data[12] = 'l';
+    data[13] = 'x';
+    data[14] = '.';
+    data[14] = 0;
+    rc522_card_block_RW(rc522, NULL, 0, KeyA_default, 0, self_to_addr(3, 0), data);
+    rc522_card_block_RW(rc522, NULL, 0, KeyA_default, 1, self_to_addr(3, 0), data);
+    rc522_log("读出扇区数据：");
+    rc522_hexdump(data, 16);
+}
+
 // RC522的任务
 static void rc522_task(void *arg)
 {
@@ -1136,69 +1166,50 @@ static void rc522_task(void *arg)
 
     while (rc522->running)
     {
-        if (!rc522->scanning)
+        if (rc522->scanning)
         {
-            // Idling...
-            vTaskDelay(100 / portTICK_PERIOD_MS);
+            uint8_t *serial_no_array = NULL;
+            if (ESP_OK != rc522_get_tag(rc522, &serial_no_array))
+            {
+                // Tag is not present
+                //
+                // TODO: Implement logic to know when the error is due to
+                //       tag absence or some other protocol issue
+            }
+
+            if (!serial_no_array)
+            {
+                rc522->tag_was_present_last_time = false;
+            }
+            else if (!rc522->tag_was_present_last_time)
+            {
+                rc522_tag_t tag = {
+                    .serial_number = rc522_sn_to_u64(serial_no_array),
+                    .snp = (uint8_t[]){serial_no_array[0], serial_no_array[1], serial_no_array[2], serial_no_array[3]}};
+                FREE(serial_no_array);
+                rc522_dispatch_event(rc522, RC522_EVENT_TAG_SCANNED, &tag);
+                rc522->tag_was_present_last_time = true;
+                // block_rw_test(rc522);
+                
+            }
+            else
+            {
+                FREE(serial_no_array);
+            }
+
+            int delay_interval_ms = rc522->config->scan_interval_ms;
+
+            if (rc522->tag_was_present_last_time)
+            {
+                delay_interval_ms *= 2; // extra scan-bursting prevention
+            }
+            vTaskDelay(delay_interval_ms / portTICK_PERIOD_MS);
             continue;
         }
 
-        uint8_t *serial_no_array = NULL;
-        if (ESP_OK != rc522_get_tag(rc522, &serial_no_array))
-        {
-            // Tag is not present
-            //
-            // TODO: Implement logic to know when the error is due to
-            //       tag absence or some other protocol issue
-        }
+        
 
-        if (!serial_no_array)
-        {
-            rc522->tag_was_present_last_time = false;
-        }
-        else if (!rc522->tag_was_present_last_time)
-        {
-            rc522_tag_t tag = {
-                .serial_number = rc522_sn_to_u64(serial_no_array),
-                .snp = (uint8_t[]){serial_no_array[0], serial_no_array[1], serial_no_array[2], serial_no_array[3]}};
-            FREE(serial_no_array);
-            rc522_dispatch_event(rc522, RC522_EVENT_TAG_SCANNED, &tag);
-            rc522->tag_was_present_last_time = true;
-            uint8_t data[16];
-            memset(data, 0, 16);
-            data[0] = 'H';
-            data[1] = 'e';
-            data[2] = 'l';
-            data[3] = 'l';
-            data[4] = 'o';
-            data[5] = ',';
-            data[6] = 'f';
-            data[7] = 'r';
-            data[8] = 'o';
-            data[9] = 'm';
-            data[10] = 'e';
-            data[11] = ' ';
-            data[12] = 'w';
-            data[13] = 'l';
-            data[14] = 'x';
-            rc522_card_block_RW(rc522, tag.snp, 0, KeyA_default, 0, self_to_addr(3, 0), data);
-            rc522_card_block_RW(rc522, tag.snp, 0, KeyA_default, 1, self_to_addr(3, 0), data);
-            rc522_log("读出扇区数据：");
-            rc522_hexdump(data, 16);
-        }
-        else
-        {
-            FREE(serial_no_array);
-        }
-
-        int delay_interval_ms = rc522->config->scan_interval_ms;
-
-        if (rc522->tag_was_present_last_time)
-        {
-            delay_interval_ms *= 2; // extra scan-bursting prevention
-        }
-
-        vTaskDelay(delay_interval_ms / portTICK_PERIOD_MS);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 
     vTaskDelete(NULL);

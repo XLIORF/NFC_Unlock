@@ -7,7 +7,7 @@ extern "C" {
 #include <esp_event.h>
 #include <driver/spi_master.h>
 #include <driver/i2c.h> // TODO: Log warning: This driver is an old driver, please migrate your application code to adapt `driver/i2c_master.h`
-
+#include "rc522_def.h"
 #define RC522_I2C_ADDRESS (0x28)
 
 #define RC522_DEFAULT_SCAN_INTERVAL_MS (125)
@@ -122,6 +122,18 @@ esp_err_t rc522_pause(rc522_handle_t rc522);
  * @param rc522 Handle
  */
 esp_err_t rc522_destroy(rc522_handle_t rc522);
+
+
+/// @brief 读写卡片的某一个扇区
+/// @param rc522 句柄
+/// @param UID 卡片的UID，暂时没有实现 //todo
+/// @param key_type 密钥类型，0表示KeyA，其他表示KeyB
+/// @param KEY 密钥指针，长度位6个字节
+/// @param RW 0表示写， 1表示度
+/// @param data_addr 块地址
+/// @param data 数据缓存区，自行创建然后传入
+/// @return 
+rc522_err_t rc522_card_block_RW(rc522_handle_t rc522, uint8_t *UID, uint8_t key_type, uint8_t *KEY, uint8_t RW, uint8_t data_addr, uint8_t *data);
 
 #ifdef __cplusplus
 }
