@@ -1,9 +1,18 @@
 #pragma once
 
+
+/**
+ * 移植修改这个部分，开始
+ */
 #include <esp_err.h>
 #define RETURN_SUCCESS 0
-#define ERR_OUTPUT(format, ...) ESP_LOGE(TAG, format, ##__VA_ARGS__)
 #define ERR_NULL_MEM ESP_ERR_NO_MEM
+#define ERR_OUTPUT(format, ...) ESP_LOGE(TAG, format, ##__VA_ARGS__)
+/**
+ * 移植修改这个部分，结束
+ */
+
+
 /**
  * @brief Label for success guard gate in macros.
  *        Used as a goto label to handle successful execution paths in macros.

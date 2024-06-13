@@ -497,7 +497,8 @@ static esp_err_t rc522_card_write(rc522_handle_t rc522, uint8_t cmd,
         {
             *res_n = _res_n;
             *result = _result;
-        });
+        }
+    );
 
     return err;
 }
@@ -594,8 +595,6 @@ static esp_err_t rc522_selece_card(rc522_handle_t rc522, uint8_t *sn)
         rc522_loge("选卡函数返回失败");
         return err;
     }
-    // rc522_log("选卡返回结果：");
-    // rc522_hexdump(res_data, res_data_n);
     FREE(res_data);
     if (res_data_n * 8 == 0x18)
         err = ESP_OK;
@@ -612,7 +611,6 @@ static esp_err_t rc522_selece_card(rc522_handle_t rc522, uint8_t *sn)
 //          pKey[IN]：密码
 //          pSnr[IN]：卡片序列号，4字节
 // 返    回: 成功返回MI_OK
-/////////////////////////////////////////////////////////////////////
 char rc522_card_block_auth(rc522_handle_t rc522, uint8_t auth_mode, uint8_t addr, uint8_t *pKey, uint8_t *pSnr)
 {
     esp_err_t err = ESP_OK;
