@@ -173,7 +173,7 @@ void hid_demo_task(void *pvParameters)
             vTaskDelay(1000);
         }
     }
-}
+}  
 
 void ble_init()
 {

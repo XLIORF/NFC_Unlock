@@ -221,9 +221,11 @@ void rc522_task(void *arg)
             rc522_delay_ms(100);
             continue;
         }
-
+        // 等待时关闭射频，待机功耗减少65mA
+        // rc522_pcd_clear_bits(rc522, RC522_PCD_TX_CONTROL_REG, (RC522_PCD_TX2_RF_EN_BIT | RC522_PCD_TX1_RF_EN_BIT));
         rc522_delay_ms(task_delay_ms);
-
+        // rc522_pcd_set_bits(rc522, RC522_PCD_TX_CONTROL_REG, (RC522_PCD_TX2_RF_EN_BIT | RC522_PCD_TX1_RF_EN_BIT));
+        // rc522_delay_ms(5);
         bool should_poll = (rc522_millis() - last_poll_ms) > rc522->config->poll_interval_ms;
 
         if (rc522->picc.state == RC522_PICC_STATE_IDLE || rc522->picc.state == RC522_PICC_STATE_HALT) {

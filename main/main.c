@@ -4,7 +4,7 @@
 #include "nfcAPP.h"
 #include "bleAPP.h"
 #include "driver/i2c.h"
-
+#include "esp_sleep.h"
 static esp_err_t i2c_master_init(void)
 {
     i2c_config_t conf = {
@@ -25,5 +25,6 @@ void app_main()
 {
     ble_init();
     nrf_app_start();
-    i2c_master_init();
+    // i2c_master_init();
+    // esp_deep_sleep_start();
 }

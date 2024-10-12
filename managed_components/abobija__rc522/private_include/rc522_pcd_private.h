@@ -92,6 +92,23 @@ typedef enum
 
     // Defines the data rate during reception
     RC522_PCD_RX_MODE_REG = 0x13,
+
+    // LPCD寄存器
+    WS1850S_DiV_EN_REG = 0x03,//BIT5:使能卡探测中断
+    WS1850S_DIV_IRQ_REG = 0x05, // BIT5:产生卡中断
+    // Page4扩展寄存器
+    WS1850S_LPCD_RSVD_REG = 0x3C,
+    WS1850S_WU_PERIOD_REG = 0x3D,
+    WS1850S_SWINGS_CNT_REG = 0x3E,
+
+    // Page6扩展寄存器
+    // LPCD检测参考值
+    WS1850S_LPCD_REF_VAL_REG = 0x31,
+    WS1850S_P5_REG33 = 0x33,
+    WS1850S_LPCD_ADC_REF = 0x36,
+    WS1850S_CWGSN_LPCD = 0x38,
+    WS1850S_RSVD = 0x39,
+
 } rc522_pcd_register_t;
 
 enum // RC522_PCD_COLL_REG
@@ -462,6 +479,10 @@ esp_err_t rc522_pcd_read(const rc522_handle_t rc522, rc522_pcd_register_t addr, 
 esp_err_t rc522_pcd_set_bits(const rc522_handle_t rc522, rc522_pcd_register_t addr, uint8_t bits);
 
 esp_err_t rc522_pcd_clear_bits(const rc522_handle_t rc522, rc522_pcd_register_t addr, uint8_t bits);
+// 扩展寄存器读写
+// p4orp6: 1是Page4，0是Page6
+void ws1850s_extern_reg_write(const rc522_handle_t rc522, rc522_pcd_register_t addr, uint8_t data);
+void ws1850s_extern_reg_read(const rc522_handle_t rc522, rc522_pcd_register_t addr, uint8_t *data);
 
 #ifdef __cplusplus
 }

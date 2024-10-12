@@ -186,6 +186,22 @@ esp_err_t rc522_pcd_init(const rc522_handle_t rc522)
     // Enable the antenna driver pins TX1 and TX2 (they were disabled by the reset)
     RC522_RETURN_ON_ERROR(rc522_pcd_tx_enable(rc522));
 
+    //* LPCD配置，不管用，还会导致一个开机picc_comm通信失败
+    // RC522_RETURN_ON_ERROR(rc522_pcd_write(rc522, RC522_PCD_VERSION_REG, 0x5E)); // 打开Page4私有寄存器开关
+    // RC522_RETURN_ON_ERROR(rc522_pcd_write(rc522, WS1850S_LPCD_RSVD_REG, 0x34)); // 设置Delta[3:0]=4，开启32K
+    // RC522_RETURN_ON_ERROR(rc522_pcd_write(rc522, WS1850S_WU_PERIOD_REG, 0x40)); // 设置休眠时间500ms
+    // RC522_RETURN_ON_ERROR(rc522_pcd_write(rc522, WS1850S_SWINGS_CNT_REG, 0x95)); // 设置连续探次数，开启LPCD_en
+    // RC522_RETURN_ON_ERROR(rc522_pcd_write(rc522, RC522_PCD_VERSION_REG, 0x00)); // 关闭有寄存器开关
+
+    // RC522_RETURN_ON_ERROR(rc522_pcd_write(rc522, RC522_PCD_VERSION_REG, 0x5A)); // 打开Page6私有寄存器开关
+    // RC522_RETURN_ON_ERROR(rc522_pcd_write(rc522, WS1850S_CWGSN_LPCD, 0xF0)); // 
+    // RC522_RETURN_ON_ERROR(rc522_pcd_write(rc522, WS1850S_RSVD, 0x3F)); // 
+    // RC522_RETURN_ON_ERROR(rc522_pcd_write(rc522, WS1850S_P5_REG33, 0xA0)); // 
+    // RC522_RETURN_ON_ERROR(rc522_pcd_write(rc522, RC522_PCD_VERSION_REG, 0x00)); // 关闭有寄存器开关
+
+    // RC522_RETURN_ON_ERROR(rc522_pcd_write(rc522, 0x03, 0xa0)); // 关闭有寄存器开关
+    // RC522_RETURN_ON_ERROR(rc522_pcd_write(rc522, RC522_PCD_COMMAND_REG, 0x10)); //  PCD Sofr PowerDpwn 进入休眠卡检测
+
     rc522_pcd_firmware_t fw;
     ESP_RETURN_ON_ERROR(rc522_pcd_firmware(rc522, &fw), TAG, "read fw version failed");
 
@@ -369,4 +385,27 @@ inline esp_err_t rc522_pcd_clear_bits(const rc522_handle_t rc522, rc522_pcd_regi
     ESP_RETURN_ON_ERROR(rc522_pcd_read(rc522, addr, &value), TAG, "");
 
     return rc522_pcd_write(rc522, addr, value & (~bits));
+}
+
+
+// * 扩展寄存器访问
+
+void ws1850s_extern_reg_read(const rc522_handle_t rc522, rc522_pcd_register_t addr, uint8_t *data)
+{
+    uint8_t old = 0;
+    rc522_pcd_read(rc522, 0x37, &old);
+    uint8_t val = addr >= 0x3C && addr <= 0x3E ? 0x5E : 0x5A;
+    rc522_pcd_write(rc522, 0x37, val);
+    rc522_pcd_read(rc522, addr, data);
+    rc522_pcd_write(rc522, 0x37, old);
+}
+
+void ws1850s_extern_reg_write(const rc522_handle_t rc522, rc522_pcd_register_t addr, uint8_t data)
+{
+    uint8_t old = 0;
+    rc522_pcd_read(rc522, 0x37, &old);
+    uint8_t val = addr >= 0x3C && addr <= 0x3E ? 0x5E : 0x5A;
+    rc522_pcd_write(rc522, 0x37, val);
+    rc522_pcd_write(rc522, addr, data);
+    rc522_pcd_write(rc522, 0x37, old);
 }
