@@ -60,3 +60,28 @@ menu "network app Configuration"
         help
             Keep-alive probe packet retry count.
 endmenu
+
+menu "NFC config"
+
+    config RC522_MISO
+        int "RC522 MISO"
+        default 10
+
+    config RC522_MOSI
+        int "RC522 MOSI"
+        default 5
+
+    config RC522_SCLK
+        int "RC522 SCLK"
+        default 6
+
+    config RC522_SDA
+        int "RC522 SDA"
+        default 2
+        help
+            RC522的片选引脚，可能被标注为cs或者sda
+
+    config RC522_RST
+        int "RC522 RST"
+        default -1
+endmenu

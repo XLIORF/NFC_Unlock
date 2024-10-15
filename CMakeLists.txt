@@ -2,6 +2,7 @@
 # in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.16)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(EXTERN_COMPONENT_DIRS components)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(hidd_demos)
