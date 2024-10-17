@@ -41,7 +41,7 @@ static const uint16_t primary_service_uuid = ESP_GATT_UUID_PRI_SERVICE;
 // static const uint16_t include_service_uuid = ESP_GATT_UUID_INCLUDE_SERVICE;
 static const uint16_t character_declaration_uuid = ESP_GATT_UUID_CHAR_DECLARE;
 static const uint16_t character_client_config_uuid = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
-static const uint8_t char_prop_read_notify_wirte = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_WRITE_NR;
+static const uint8_t char_prop_read_notify_wirte = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE ;
 
 static uint8_t unlock_status = 0;
 static const uint8_t unlock_status_ccc[2] = {0x00, 0x00};
@@ -110,6 +110,7 @@ void esp_gatt_unlock_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
         break;
     }
     case ESP_GATTS_CREAT_ATTR_TAB_EVT: {
+        ESP_LOGI(TAG, "开启服务");
         esp_ble_gatts_start_service(param->add_attr_tab.handles[UNLOCK_IDX_SVC]);
         break;
     }

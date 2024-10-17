@@ -78,6 +78,7 @@ esp_err_t rc522_start(rc522_handle_t rc522)
 
     if (rc522->state == RC522_STATE_PAUSED) {
         // Scanning has been paused. No need for reinitialization. Just resume
+        rc522_pcd_set_bits(rc522, RC522_PCD_TX_CONTROL_REG, (RC522_PCD_TX2_RF_EN_BIT | RC522_PCD_TX1_RF_EN_BIT));
         rc522->state = RC522_STATE_POLLING;
         return ESP_OK;
     }
@@ -100,7 +101,9 @@ esp_err_t rc522_pause(rc522_handle_t rc522)
         TAG,
         "Invalid state (state=%d)",
         rc522->state);
-
+    
+    // 关闭射频
+    rc522_pcd_clear_bits(rc522, RC522_PCD_TX_CONTROL_REG, (RC522_PCD_TX2_RF_EN_BIT | RC522_PCD_TX1_RF_EN_BIT));
     rc522->state = RC522_STATE_PAUSED;
 
     return ESP_OK;
@@ -222,10 +225,9 @@ void rc522_task(void *arg)
             continue;
         }
         // 等待时关闭射频，待机功耗减少65mA
-        // rc522_pcd_clear_bits(rc522, RC522_PCD_TX_CONTROL_REG, (RC522_PCD_TX2_RF_EN_BIT | RC522_PCD_TX1_RF_EN_BIT));
+        // 
         rc522_delay_ms(task_delay_ms);
-        // rc522_pcd_set_bits(rc522, RC522_PCD_TX_CONTROL_REG, (RC522_PCD_TX2_RF_EN_BIT | RC522_PCD_TX1_RF_EN_BIT));
-        // rc522_delay_ms(5);
+
         bool should_poll = (rc522_millis() - last_poll_ms) > rc522->config->poll_interval_ms;
 
         if (rc522->picc.state == RC522_PICC_STATE_IDLE || rc522->picc.state == RC522_PICC_STATE_HALT) {
