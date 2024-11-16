@@ -1,11 +1,10 @@
 #include "qmi8658c.h"
-#include <stdio.h>
-
 #include "driver/i2c.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "qmi8658c_reg.h"
+#include <stdio.h>
 #include <string.h>
 
 #define QMI8658C_ADDR 0x6A // 0x6B
@@ -13,6 +12,7 @@
 #define I2C_MASTER_NUM CONFIG_I2C_NUM
 #define qmi8658_delay(x) vTaskDelay(x / portTICK_PERIOD_MS)
 #define qmi8658c_int2 (qmi8658_int() & 0x01)
+#define QMI8658C_FIFO_SIZE 120 // 6 * 2 * 10, 每个传感器6个字节数据, 启动了加速度和陀螺仪两个传感器,存10个采样
 static const char *TAG = "QMI8658C";
 /**
  * @brief Read a sequence of bytes from a MPU9250 sensor registers
@@ -34,6 +34,22 @@ static uint8_t qmi8658c_register_read_byte(uint8_t reg_addr)
         esp_restart();
     }
     return data;
+}
+
+static int qmi8658c_register_write(uint8_t reg_addr, uint8_t *data, uint8_t len)
+{
+    int ret;
+    uint8_t *buf = calloc(1, len + 1);
+    if (buf == NULL)
+    {
+        ESP_LOGE(TAG, "内存分配失败");
+        return -1;
+    }
+    memcpy(buf + 1, data, len);
+    buf[0] = reg_addr;
+    ret = i2c_master_write_to_device(I2C_MASTER_NUM, QMI8658C_ADDR, buf, len + 1,
+                                     I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    return ret;
 }
 
 static int qmi8658c_register_write_byte(uint8_t reg_addr, uint8_t data)
@@ -149,6 +165,42 @@ int qmi8658c_self_test()
     return 0;
 }
 
+int qmi8658c_mode_WoM()
+{
+    /*
+    CTRL7 aEN =1, gEN =0, mEN =0
+    CTRL2 aODR = 11xx
+    */
+    return 0;
+}
+
+int qmi8658c_mode_IMU()
+{
+    /*
+    CTRL7 gSN=0, aEN =1, gEN =1, mEN =0
+    CTRL2 aODR != 11xx
+    */
+    return 0;
+}
+
+int qmi8658c_mode_6DAE()
+{
+    /*
+    CTRL7 aEN = 1, gEN = 1, sEN = 1
+    CTRL2 aODR=0xx
+    */
+    return 0;
+}
+
+int qmi8658c_mode_MoD()
+{
+    /*
+    CTRL7 aEN = 1, gEN = 1, sEN = 1
+    CTRL6 sMOD = 1
+    */
+    return 0;
+}
+
 int qmi8658c_init()
 {
     uint8_t id = qmi8658c_register_read_byte(WHO_AM_I);
@@ -198,17 +250,21 @@ void qmi8658c_get_acce(float *x, float *y, float *z)
     // }
 
     // 读取数据
-    // qmi8658c_register_read(AX_L,)
-    uint8_t accex_l = qmi8658c_register_read_byte(AX_L);
-    uint8_t accex_h = qmi8658c_register_read_byte(AX_H);
-    uint8_t accey_l = qmi8658c_register_read_byte(AY_L);
-    uint8_t accey_h = qmi8658c_register_read_byte(AY_H);
-    uint8_t accez_l = qmi8658c_register_read_byte(AZ_L);
-    uint8_t accez_h = qmi8658c_register_read_byte(AZ_H);
+    uint8_t acce[6] = {0};
+    qmi8658c_register_read(AX_L, acce, 6);
+    *x = ((acce[1] << 8 | acce[0]) - 128) / 8192.0 * 9.8;
+    *y = ((acce[3] << 8 | acce[2]) - 128) / 8192.0 * 9.8;
+    *z = ((acce[5] << 8 | acce[4]) - 128) / 8192.0 * 9.8;
+    // uint8_t accex_l = qmi8658c_register_read_byte(AX_L);
+    // uint8_t accex_h = qmi8658c_register_read_byte(AX_H);
+    // uint8_t accey_l = qmi8658c_register_read_byte(AY_L);
+    // uint8_t accey_h = qmi8658c_register_read_byte(AY_H);
+    // uint8_t accez_l = qmi8658c_register_read_byte(AZ_L);
+    // uint8_t accez_h = qmi8658c_register_read_byte(AZ_H);
 
-    *x = ((accex_h << 8 | accex_l) - 128) / 8192.0 * 9.8;
-    *y = ((accey_h << 8 | accey_l) - 128) / 8192.0 * 9.8;
-    *z = ((accez_h << 8 | accez_l) - 128) / 8192.0 * 9.8;
+    // *x = ((accex_h << 8 | accex_l) - 128) / 8192.0 * 9.8;
+    // *y = ((accey_h << 8 | accey_l) - 128) / 8192.0 * 9.8;
+    // *z = ((accez_h << 8 | accez_l) - 128) / 8192.0 * 9.8;
 }
 
 // ! 读数有反应但是不是是否正确
@@ -229,17 +285,21 @@ void qmi8658c_get_gyro(float *x, float *y, float *z)
     //     status = qmi8658c_register_read_byte(STATUSINT);
     //     qmi8658_delay(1);
     // }
+    uint8_t gyrox[6] = {0};
+    qmi8658c_register_read(GX_L, gyrox, 6);
+    *x = ((gyrox[1] << 8 | gyrox[0]) - 32768) / 1024.0;
+    *y = ((gyrox[3] << 8 | gyrox[2]) - 32768) / 1024.0;
+    *z = ((gyrox[5] << 8 | gyrox[4]) - 32768) / 1024.0;
+    // uint8_t gyrox_l = qmi8658c_register_read_byte(GX_L);
+    // uint8_t gyrox_h = qmi8658c_register_read_byte(GX_H);
+    // uint8_t gyroy_l = qmi8658c_register_read_byte(GY_L);
+    // uint8_t gyroy_h = qmi8658c_register_read_byte(GY_H);
+    // uint8_t gyroz_l = qmi8658c_register_read_byte(GZ_L);
+    // uint8_t gyroz_h = qmi8658c_register_read_byte(GZ_H);
 
-    uint8_t gyrox_l = qmi8658c_register_read_byte(GX_L);
-    uint8_t gyrox_h = qmi8658c_register_read_byte(GX_H);
-    uint8_t gyroy_l = qmi8658c_register_read_byte(GY_L);
-    uint8_t gyroy_h = qmi8658c_register_read_byte(GY_H);
-    uint8_t gyroz_l = qmi8658c_register_read_byte(GZ_L);
-    uint8_t gyroz_h = qmi8658c_register_read_byte(GZ_H);
-
-    *x = ((gyrox_h << 8 | gyrox_l) - 32768) / 1024.0;
-    *y = ((gyroy_h << 8 | gyroy_l) - 32768) / 1024.0;
-    *z = ((gyroz_h << 8 | gyroz_l) - 32768) / 1024.0;
+    // *x = ((gyrox_h << 8 | gyrox_l) - 32768) / 1024.0;
+    // *y = ((gyroy_h << 8 | gyroy_l) - 32768) / 1024.0;
+    // *z = ((gyroz_h << 8 | gyroz_l) - 32768) / 1024.0;
 }
 
 //! 读数偏差较大
@@ -312,4 +372,72 @@ void qmi8658c_get_quaternion(float *dqw, float *dqx, float *dqy, float *dqz)
     *dqx = (float)(data[3] << 8 | data[2]);
     *dqy = (float)(data[5] << 8 | data[4]);
     *dqz = (float)(data[7] << 8 | data[6]);
+}
+
+int qmi8658c_wctrl9(uint8_t cmd)
+{
+    // 命令需要的数据放到CAL寄存器中
+
+    // 写入命令
+    qmi8658c_register_write_byte(CTRL9, cmd);
+    uint8_t ret = qmi8658c_register_read_byte(CTRL8) & BIT_CTRL9_CmdDone;
+    if (ret != 1)
+    {
+        ESP_LOGE(TAG, "CTRL9 命令执行失败");
+        return -1;
+    }
+
+    return 0;
+}
+
+int qmi8658c_ctrl9r(uint8_t cmd)
+{
+    qmi8658c_register_write_byte(CTRL9, cmd);
+    uint8_t ret = qmi8658c_register_read_byte(CTRL8) & BIT_CTRL9_CmdDone;
+    if (ret != 1)
+    {
+        ESP_LOGE(TAG, "CTRL9 命令执行失败");
+        return -1;
+    }
+    return 0;
+}
+// threshold: 触发阈值 绝对值以1mg为单位(分辨率为1mg/LSB)
+// int_sel:中断选择,00-INT1,初始值0,10--INT1初始值1;01--INT2初始值0,11--INT2初始值1
+// blank_time:中断消隐时间(以加速度样本数量为单位)
+int qmi8658c_config_WoM(uint8_t threshold, uint8_t int_sel, uint8_t blank_time)
+{
+    // 准备数据
+    qmi8658c_register_write_byte(CAL1_L, threshold);
+    qmi8658c_register_write_byte(CAL1_H, int_sel << 6 | blank_time);
+    // 写入命令
+    qmi8658c_register_write_byte(CTRL9, CTRL_CMD_WRITE_WOM_SETTING);
+    // 读取状态并消除状态
+    uint8_t ret = qmi8658c_register_read_byte(CTRL8) & BIT_CTRL9_CmdDone;
+    if (ret != 1)
+    {
+        ESP_LOGE(TAG, "CTRL9 命令执行失败");
+        return -1;
+    }
+    return 0;
+}
+
+int qmi8658c_fifo_read(uint8_t *buf, uint8_t len)
+{
+    memset(buf, 0, len);
+    qmi8658c_register_write_byte(CTRL9, 0x0D); // 置位FIFO_RD_MODE
+    uint8_t data_len = 0;
+    while (qmi8658c_register_read_byte(FIFO_STATUS) & BIT_FIFO_NOT_EMPTY)
+    {
+        buf[data_len++] = qmi8658c_register_read_byte(FIFO_DATA);
+        if (data_len >= len)
+            break;
+    }
+    // qmi8658c_register_write_byte(FIFO_CTRL, FIFO_RD_MODE)
+    clear_reg_bit(FIFO_CTRL, FIFO_RD_MODE);
+    return data_len;
+}
+
+int qmi8658c_fifo_write(uint8_t *buf, uint8_t len)
+{
+    return qmi8658c_register_write(FIFO_DATA, buf, len);
 }
